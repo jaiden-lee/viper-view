@@ -9,8 +9,11 @@ public class PermissionManager {
     private final Activity activity;
 
     public static final int REQUEST_CODE_PERMISSIONS = 10;
+
+    // Include mic and camera together
     public static final String[] REQUIRED_PERMISSIONS = new String[] {
-            android.Manifest.permission.CAMERA
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO
     };
 
     public PermissionManager(Activity activity) {

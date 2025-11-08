@@ -62,7 +62,7 @@ public class PoseDetector {
         return output;
     }
 
-    public Bitmap drawSkeleton(Bitmap frame, float[][][] detections) {
+    public Bitmap drawSkeleton(Bitmap frame, float[][][] detections, boolean displaySkeletons, boolean displayBBox) {
         Bitmap mutable = frame.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(mutable);
         Paint paint = new Paint();
@@ -116,34 +116,41 @@ public class PoseDetector {
             float bottom = (cy + h / 2) * height;
 
             // draw bounding box
-            paint.setStyle(Paint.Style.STROKE);
-            canvas.drawRect(left, top, right, bottom, paint);
+            if (displayBBox) {
+                paint.setStyle(Paint.Style.STROKE);
+                canvas.drawRect(left, top, right, bottom, paint);
+            }
+
 
             // draw keypoints
-            paint.setStyle(Paint.Style.FILL);
-            for (int k = 0; k < 17; k++) {
-                float x = det[5 + k * 3] * width;
-                float y = det[5 + k * 3 + 1] * height;
-                float c = det[5 + k * 3 + 2];
-                if (c > 0.3f) {
-                    canvas.drawCircle(x, y, 4, paint);
+            if (displaySkeletons) {
+                paint.setStyle(Paint.Style.FILL);
+                for (int k = 0; k < 17; k++) {
+                    float x = det[5 + k * 3] * width;
+                    float y = det[5 + k * 3 + 1] * height;
+                    float c = det[5 + k * 3 + 2];
+                    if (c > 0.3f) {
+                        canvas.drawCircle(x, y, 4, paint);
+                    }
+                }
+
+                // connect keypoints
+                paint.setStrokeWidth(2f);
+                for (int[] pair : skeletonPairs) {
+                    int i1 = pair[0];
+                    int i2 = pair[1];
+                    float x1 = det[5 + i1 * 3] * width;
+                    float y1 = det[5 + i1 * 3 + 1] * height;
+                    float x2 = det[5 + i2 * 3] * width;
+                    float y2 = det[5 + i2 * 3 + 1] * height;
+                    float c1 = det[5 + i1 * 3 + 2];
+                    float c2 = det[5 + i2 * 3 + 2];
+                    if (c1 > 0.3f && c2 > 0.3f)
+                        canvas.drawLine(x1, y1, x2, y2, paint);
                 }
             }
 
-            // connect keypoints
-            paint.setStrokeWidth(2f);
-            for (int[] pair : skeletonPairs) {
-                int i1 = pair[0];
-                int i2 = pair[1];
-                float x1 = det[5 + i1 * 3] * width;
-                float y1 = det[5 + i1 * 3 + 1] * height;
-                float x2 = det[5 + i2 * 3] * width;
-                float y2 = det[5 + i2 * 3 + 1] * height;
-                float c1 = det[5 + i1 * 3 + 2];
-                float c2 = det[5 + i2 * 3 + 2];
-                if (c1 > 0.3f && c2 > 0.3f)
-                    canvas.drawLine(x1, y1, x2, y2, paint);
-            }
+
         }
 
         return mutable;
