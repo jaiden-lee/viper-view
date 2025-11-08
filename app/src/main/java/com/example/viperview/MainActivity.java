@@ -1,5 +1,6 @@
 package com.example.viperview;
 
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.widget.ImageView;
 
@@ -15,6 +16,10 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.example.viperview.camera.CameraController;
 import com.example.viperview.permissions.PermissionManager;
+import com.example.viperview.yolo.PoseDetector;
+
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -23,6 +28,11 @@ public class MainActivity extends AppCompatActivity {
 
     private ImageView leftImage;
     private ImageView rightImage;
+    private PoseDetector poseDetector;
+    private final java.util.concurrent.ExecutorService inferExec =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
+    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
 
 
     @Override
@@ -35,12 +45,16 @@ public class MainActivity extends AppCompatActivity {
 
         cameraController = new CameraController(this);
         permissionManager = new PermissionManager(this);
+        try {
+            poseDetector = new PoseDetector(getAssets(), "yolo11n-pose_float16.tflite");
+        } catch (IOException e) {
+            e.printStackTrace();
+            finish();
+        }
 
-//        defineCameraViews();
         defineImageViews();
 
         if (permissionManager.allPermissionsGranted()) {
-//            cameraController.startCamera(leftPreview, rightPreview, leftView, rightView);
             startCapturing();
         } else {
             ActivityCompat.requestPermissions(
@@ -53,13 +67,26 @@ public class MainActivity extends AppCompatActivity {
 
     private void startCapturing() {
         cameraController.startFrameCapture(frame -> {
-            runOnUiThread(() -> {
-                // Show the same frame in both eyes for now
-                leftImage.setImageBitmap(frame);
-                rightImage.setImageBitmap(frame);
+            if (isProcessing.get()) return; // drop if busy
+            isProcessing.set(true);
+
+            inferExec.execute(() -> {
+                try {
+                    float[][][] detections = poseDetector.run(frame);
+                    Bitmap result = poseDetector.drawSkeleton(frame, detections);
+
+                    runOnUiThread(() -> {
+                        leftImage.setImageBitmap(result);
+                        rightImage.setImageBitmap(result);
+                    });
+                } finally {
+                    isProcessing.set(false);
+                }
             });
         });
     }
+
+
 
     private void defineImageViews() {
         leftImage = findViewById(R.id.leftImage);
@@ -71,27 +98,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void hideSystemUI() {
-        // Hide the action bar if present
         if (getSupportActionBar() != null) {
             getSupportActionBar().hide();
         }
-
-        // Make content appear behind system bars
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-
-        // Get the controller
         WindowInsetsControllerCompat insetsController =
                 new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
-
-        // Hide both navigation and status bars
         insetsController.hide(WindowInsetsCompat.Type.systemBars());
-
-        // Set behavior so bars reappear only with swipe gestures
         insetsController.setSystemBarsBehavior(
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         );
-
-        // Keep the screen on
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
@@ -103,7 +119,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == PermissionManager.REQUEST_CODE_PERMISSIONS) {
             if (permissionManager.allPermissionsGranted()) {
-//                cameraController.startCamera(leftPreview, rightPreview, leftView, rightView);
                 startCapturing();
             } else {
                 finish(); // Exit if denied
