@@ -21,13 +21,9 @@ public class MainActivity extends AppCompatActivity {
     private CameraController cameraController;
     private PermissionManager permissionManager;
 
-    private PreviewView leftView;
-    private PreviewView rightView;
-
     private ImageView leftImage;
     private ImageView rightImage;
-    private Preview leftPreview;
-    private Preview rightPreview;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,22 +68,6 @@ public class MainActivity extends AppCompatActivity {
         float shift = getResources().getDisplayMetrics().density * 25; // 20dp
         leftImage.setTranslationX(shift);
         rightImage.setTranslationX(-shift);
-    }
-
-    private void defineCameraViews() {
-        leftView = findViewById(R.id.leftView);
-        rightView = findViewById(R.id.rightView);
-        leftView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
-        rightView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
-
-        leftPreview = new Preview.Builder().build();
-        rightPreview = new Preview.Builder().build();
-        leftPreview.setSurfaceProvider(leftView.getSurfaceProvider());
-        rightPreview.setSurfaceProvider(rightView.getSurfaceProvider());
-
-        float shift = getResources().getDisplayMetrics().density * 25; // 20dp
-        leftView.setTranslationX(shift);
-        rightView.setTranslationX(-shift);
     }
 
     private void hideSystemUI() {
