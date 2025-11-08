@@ -22,6 +22,7 @@ import java.util.List;
 
 public class PoseDetector {
     private Interpreter interpreter;
+
     public PoseDetector(AssetManager assetManager, String modelPath) throws IOException {
         Interpreter.Options options = new Interpreter.Options();
         options.setNumThreads(4);
@@ -49,8 +50,8 @@ public class PoseDetector {
         for (int p : pixels) {
             // RGB normalized [0,1]
             inputBuffer.putFloat(((p >> 16) & 0xFF) / 255f);
-            inputBuffer.putFloat(((p >>  8) & 0xFF) / 255f);
-            inputBuffer.putFloat(( p        & 0xFF) / 255f);
+            inputBuffer.putFloat(((p >> 8) & 0xFF) / 255f);
+            inputBuffer.putFloat((p & 0xFF) / 255f);
         }
         inputBuffer.rewind(); // ✅ important
 
@@ -60,6 +61,7 @@ public class PoseDetector {
         interpreter.run(inputBuffer, output);
         return output;
     }
+
     public Bitmap drawSkeleton(Bitmap frame, float[][][] detections) {
         Bitmap mutable = frame.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(mutable);
@@ -74,10 +76,12 @@ public class PoseDetector {
         List<float[]> allDetections = new ArrayList<>();
         for (int i = 0; i < detections[0][0].length; i++) {
             float conf = detections[0][4][i];
-            if (conf < 0.5f) continue; // skip weak detections
+            if (conf < 0.3f)
+                continue; // skip weak detections
 
             float[] det = new float[56];
-            for (int j = 0; j < 56; j++) det[j] = detections[0][j][i];
+            for (int j = 0; j < 56; j++)
+                det[j] = detections[0][j][i];
             allDetections.add(det);
         }
 
@@ -86,11 +90,14 @@ public class PoseDetector {
 
         // Step 3: Define COCO keypoint connection pairs
         int[][] skeletonPairs = {
-                {0, 1}, {1, 2}, {2, 3}, {3, 4},      // right arm
-                {1, 5}, {5, 6}, {6, 7},              // left arm
-                {1, 8}, {8, 9}, {9, 10},             // right leg
-                {1, 11}, {11, 12}, {12, 13},         // left leg
-                {1, 14}, {14, 15}, {15, 16}          // face/upper body
+                { 5, 6 }, // shoulders
+                { 5, 7 }, { 7, 9 }, // left arm
+                { 6, 8 }, { 8, 10 }, // right arm
+                { 5, 11 }, { 6, 12 }, // torso sides
+                { 11, 12 }, // hips
+                { 11, 13 }, { 13, 15 }, // left leg
+                { 12, 14 }, { 14, 16 }, // right leg
+                { 0, 1 }, { 0, 2 }, { 1, 3 }, { 2, 4 } // face connections
         };
 
         // Step 4: Draw all filtered detections
@@ -99,8 +106,7 @@ public class PoseDetector {
             paint.setColor(Color.rgb(
                     (int) (0),
                     (int) (255),
-                    (int) (0)
-            ));
+                    (int) (0)));
 
             // extract bbox
             float cx = det[0], cy = det[1], w = det[2], h = det[3];
@@ -143,7 +149,6 @@ public class PoseDetector {
         return mutable;
     }
 
-
     private float iou(float[] a, float[] b) {
         float ax1 = a[0] - a[2] / 2, ay1 = a[1] - a[3] / 2;
         float ax2 = a[0] + a[2] / 2, ay2 = a[1] + a[3] / 2;
@@ -168,10 +173,12 @@ public class PoseDetector {
 
         boolean[] removed = new boolean[detections.size()];
         for (int i = 0; i < detections.size(); i++) {
-            if (removed[i]) continue;
+            if (removed[i])
+                continue;
             results.add(detections.get(i));
             for (int j = i + 1; j < detections.size(); j++) {
-                if (removed[j]) continue;
+                if (removed[j])
+                    continue;
                 if (iou(detections.get(i), detections.get(j)) > iouThreshold) {
                     removed[j] = true;
                 }
@@ -179,7 +186,6 @@ public class PoseDetector {
         }
         return results;
     }
-
 
     public void close() {
         interpreter.close();
