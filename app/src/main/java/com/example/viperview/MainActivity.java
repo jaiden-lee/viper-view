@@ -1,6 +1,7 @@
 package com.example.viperview;
 
 import android.os.Bundle;
+import android.widget.ImageView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.annotation.NonNull;
@@ -22,6 +23,9 @@ public class MainActivity extends AppCompatActivity {
 
     private PreviewView leftView;
     private PreviewView rightView;
+
+    private ImageView leftImage;
+    private ImageView rightImage;
     private Preview leftPreview;
     private Preview rightPreview;
 
@@ -29,17 +33,19 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main_image_view);
 
         hideSystemUI();
 
         cameraController = new CameraController(this);
         permissionManager = new PermissionManager(this);
 
-        defineCameraViews();
+//        defineCameraViews();
+        defineImageViews();
 
         if (permissionManager.allPermissionsGranted()) {
-            cameraController.startCamera(leftPreview, rightPreview, leftView, rightView);
+//            cameraController.startCamera(leftPreview, rightPreview, leftView, rightView);
+            startCapturing();
         } else {
             ActivityCompat.requestPermissions(
                     this,
@@ -49,6 +55,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void startCapturing() {
+        cameraController.startFrameCapture(frame -> {
+            runOnUiThread(() -> {
+                // Show the same frame in both eyes for now
+                leftImage.setImageBitmap(frame);
+                rightImage.setImageBitmap(frame);
+            });
+        });
+    }
+
+    private void defineImageViews() {
+        leftImage = findViewById(R.id.leftImage);
+        rightImage = findViewById(R.id.rightImage);
+
+        float shift = getResources().getDisplayMetrics().density * 25; // 20dp
+        leftImage.setTranslationX(shift);
+        rightImage.setTranslationX(-shift);
+    }
 
     private void defineCameraViews() {
         leftView = findViewById(R.id.leftView);
@@ -99,7 +123,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == PermissionManager.REQUEST_CODE_PERMISSIONS) {
             if (permissionManager.allPermissionsGranted()) {
-                cameraController.startCamera(leftPreview, rightPreview, leftView, rightView);
+//                cameraController.startCamera(leftPreview, rightPreview, leftView, rightView);
+                startCapturing();
             } else {
                 finish(); // Exit if denied
             }

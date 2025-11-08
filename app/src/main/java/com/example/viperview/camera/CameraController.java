@@ -1,6 +1,7 @@
 package com.example.viperview.camera;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
@@ -8,6 +9,8 @@ import android.util.SizeF;
 
 import androidx.annotation.OptIn;
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageProxy;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Preview;
@@ -16,6 +19,7 @@ import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 
@@ -76,6 +80,71 @@ public class CameraController {
                 e.printStackTrace();
             }
         }, ContextCompat.getMainExecutor(context));
+    }
+
+    @OptIn(markerClass = ExperimentalCamera2Interop.class)
+    public void startFrameCapture(java.util.function.Consumer<Bitmap> onFrame) {
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(context);
+
+        cameraProviderFuture.addListener(() -> {
+            try {
+                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+
+                String ultraWideId = findUltraWideCameraId();
+                CameraSelector cameraSelector;
+
+                if (ultraWideId != null) {
+                    cameraSelector = new CameraSelector.Builder()
+                            .addCameraFilter(cameras -> {
+                                for (androidx.camera.core.CameraInfo info : cameras) {
+                                    String id = Camera2CameraInfo.from(info).getCameraId();
+                                    if (id.equals(ultraWideId)) {
+                                        return Collections.singletonList(info);
+                                    }
+                                }
+                                return cameras;
+                            })
+                            .build();
+                } else {
+                    cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+                }
+
+                ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                        .build();
+
+                imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(context), image -> {
+                    // Convert frame to Bitmap
+                    Bitmap frameBitmap = toBitmap(image);
+                    if (frameBitmap != null && onFrame != null) {
+                        onFrame.accept(frameBitmap);
+                    }
+                    image.close(); // always close image to avoid backpressure
+                });
+
+                cameraProvider.bindToLifecycle(
+                        (androidx.lifecycle.LifecycleOwner) context,
+                        cameraSelector,
+                        imageAnalysis
+                );
+
+
+
+            } catch (ExecutionException | InterruptedException e) {
+                e.printStackTrace();
+            }
+        }, ContextCompat.getMainExecutor(context));
+    }
+
+    private Bitmap toBitmap(ImageProxy image) {
+        ImageProxy.PlaneProxy plane = image.getPlanes()[0];
+        ByteBuffer buffer = plane.getBuffer();
+        int width = image.getWidth();
+        int height = image.getHeight();
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        bitmap.copyPixelsFromBuffer(buffer);
+        return bitmap;
     }
 
     private String findUltraWideCameraId() {
