@@ -35,6 +35,12 @@ import java.util.concurrent.Executors;
 
 public class CameraStream {
 
+    public interface FrameProcessor {
+        Bitmap process(Bitmap frame);
+    }
+
+    private FrameProcessor frameProcessor;
+
     private static final String TAG = "CameraStream";
     private static final int CONNECT_TIMEOUT_MS = 4000;
 
@@ -49,9 +55,18 @@ public class CameraStream {
     private final ExecutorService networkExecutor = Executors.newSingleThreadExecutor();
 
     private final String serverIp = "100.118.244.118";
+    // private final String serverIp = "192.168.1.2";
+    // private final String serverIp = "100.101.13.39";
     private final int serverPort = 9999;
 
     private volatile boolean isProcessingFrame = false;
+
+    private volatile boolean mlEnabled = false; // toggle ML on/off
+
+    // Allow external toggling
+    public void toggleMLEnabled() {
+        this.mlEnabled = !this.mlEnabled;
+    }
 
     public CameraStream(Context context, ImageView leftImage, ImageView rightImage) {
         this.context = context;
@@ -116,6 +131,10 @@ public class CameraStream {
                 Log.e(TAG, "Failed to start camera", e);
             }
         }, ContextCompat.getMainExecutor(context));
+    }
+
+    public void setFrameProcessor(FrameProcessor processor) {
+        this.frameProcessor = processor;
     }
 
     private String findUltraWideCameraId() {
@@ -210,7 +229,10 @@ public class CameraStream {
         try {
             if (output == null)
                 return;
-            output.write(ByteBuffer.allocate(4).putInt(nv21.length).array());
+            ByteBuffer header = ByteBuffer.allocate(5);
+            header.putInt(nv21.length);
+            header.put((byte) (mlEnabled ? 1 : 0));
+            output.write(header.array());
             output.write(nv21);
             output.flush();
         } catch (Exception e) {
@@ -240,9 +262,11 @@ public class CameraStream {
                     isProcessingFrame = true;
                     Bitmap bmp = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.length);
                     if (bmp != null) {
+                        Bitmap processedBmp = (frameProcessor != null) ? frameProcessor.process(bmp) : bmp;
+
                         leftImage.post(() -> {
-                            leftImage.setImageBitmap(bmp);
-                            rightImage.setImageBitmap(bmp);
+                            leftImage.setImageBitmap(processedBmp);
+                            rightImage.setImageBitmap(processedBmp);
                             isProcessingFrame = false;
                         });
                     } else {

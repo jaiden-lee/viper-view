@@ -5,6 +5,7 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.annotation.NonNull;
@@ -81,6 +82,8 @@ public class MainActivity extends AppCompatActivity {
     private void startStreaming() {
         // Optional: stream frames over network
         cameraStream = new CameraStream(this, leftImage, rightImage);
+        cameraStream.setFrameProcessor(frame -> applyZoom(frame, zoomFactor));
+
         cameraStream.startStreaming(this);
     }
 
@@ -108,12 +111,23 @@ public class MainActivity extends AppCompatActivity {
             // android.widget.Toast.makeText(this, "Activating thermal highlight!",
             // android.widget.Toast.LENGTH_SHORT).show();
             // You could trigger your YOLO or thermal highlight logic here
+            cameraStream.toggleMLEnabled();
         } else if (command.contains("skeleton")) {
             displaySkeletons = !displaySkeletons;
             // android.widget.Toast.makeText(this, "Toggling skeletons",
             // android.widget.Toast.LENGTH_SHORT).show();
+            cameraStream.toggleMLEnabled();
+        } else if (command.contains("overlay")) {
+            // android.widget.Toast.makeText(this, "Toggling skeletons",
+            // android.widget.Toast.LENGTH_SHORT).show();
+            cameraStream.toggleMLEnabled();
+        } else if (command.contains("engage") || command.contains("disengage")) {
+            // android.widget.Toast.makeText(this, "Toggling skeletons",
+            // android.widget.Toast.LENGTH_SHORT).show();
+            cameraStream.toggleMLEnabled();
         } else if (command.contains("box")) {
             displayBBox = !displayBBox;
+            cameraStream.toggleMLEnabled();
         } else if (command.contains("zoom in")) {
             targetZoom = MAX_ZOOM;
             animateZoomChange();
@@ -145,6 +159,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Bitmap applyZoom(Bitmap frame, float zoomFactor) {
+        Log.d("hello", "" + zoomFactor);
         if (zoomFactor <= 1.01f)
             return frame; // no zoom
 
