@@ -109,6 +109,12 @@ public class MainActivity extends AppCompatActivity {
 //            android.widget.Toast.makeText(this, "Toggling skeletons", android.widget.Toast.LENGTH_SHORT).show();
         } else if (command.contains("box")) {
             displayBBox = !displayBBox;
+        } else if (command.contains("disengage")) {
+            displaySkeletons = false;
+            displayBBox = false;
+        } else if (command.contains("engage")) {
+            displaySkeletons = true;
+            displayBBox = true;
         } else if (command.contains("zoom in")) {
             targetZoom = MAX_ZOOM;
             animateZoomChange();
